@@ -174,6 +174,9 @@ def get_configured_logger(name):
 
     return logger
 
-# Assign application logger to a global var  
-logger = get_configured_logger(request.application)
+# Assign application logger to a global var
+if request.env.web2py_runtime_gae:
+    logger = logging
+else:
+    logger = get_configured_logger(request.application)
 

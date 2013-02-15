@@ -26,12 +26,13 @@ def index():
         db.user_list.email_list.commentn = T('Email addresses of list members')
     # Forms the query.
     if len(list_ids) == 0:
-	q = (db.user_list.id < 0)
+	q = (db.user_list.id == -1)
     else:
 	q = (db.user_list.id.belongs(list_ids))
     # Fixes the query for admins.
     if is_user_admin():
 	q = (db.user_list.id > 0)
+	logger.info("all query")
     grid = SQLFORM.grid(q, 
         field_id = db.user_list.id,
         csv=False, details=True,

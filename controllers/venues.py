@@ -57,43 +57,28 @@ def subopen_index():
     else:
         l = util.get_list(props.venues_can_submit)
     t = datetime.utcnow()
-    q_all = ((db.venue.close_date > t) &
-             (db.venue.is_active == True) &
-             (db.venue.is_approved == True) &
-             (db.venue.submit_constraint == None)
-             )
-    c_all = db(q_all).select(db.venue.id, db.venue.open_date)
-    # Filters by close date as well.
-    c_all_open = []
-    for c in c_all:
-        if c.open_date < t:
-            c_all_open.append(c.id)
-    if len(l) > 0:
-        q_user = ((db.venue.close_date > t) &
-                  (db.venue.is_active == True) &
-                  (db.venue.id.belongs(l))
-                  )
-        c_user = db(q_user).select(db.venue.id, db.venue.open_date)
-        for c in c_user:
-            if c.open_date < t and c.id not in c_all_open:
-                c_all_open.append(c.id)
-    if len(c_all_open) > 0:
-	q = (db.venue.id.belongs(c_all_open))
-    else:
+    if len(l) == 0:
 	q = (db.venue.id == -1)
+    else:
+	q = ((db.venue.close_date > t) & (db.venue.is_active == True) & (db.venue.id.belongs(l)))
     db.venue.name.readable = False
     grid = SQLFORM.grid(q,
         field_id=db.venue.id,
-        fields=[db.venue.name, db.venue.close_date],
+        fields=[db.venue.name, db.venue.open_date, db.venue.close_date],
         csv=False, details=False, create=False, editable=False, deletable=False,
         links=[
 	    dict(header=T('Venue'),
 		 body = lambda r: A(r.name, _href=URL('view_venue', args=[r.id]))),
-	    dict(header=T('Submit'), 
-		 body = lambda r: A(T('Submit'), _class='btn', _href=URL('submission', 'submit', args=[r.id]))),
+	    dict(header=T('Submit'), body = lambda r: submit_link(r)),
 	    ],
         )
     return dict(grid=grid)
+
+def submit_link(r):
+    if r.open_date > datetime.utcnow():
+	return T('Not yet open')
+    else:
+	return A(T('Submit'), _class='btn', _href=URL('submission', 'submit', args=[r.id]))
 
 
 @auth.requires_login()
@@ -105,44 +90,30 @@ def rateopen_index():
     else:
         l = util.get_list(props.venues_can_rate)
     t = datetime.utcnow()
-    q_all = ((db.venue.rate_close_date > datetime.utcnow()) &
-             (db.venue.is_active == True) &
-             (db.venue.is_approved == True) &
-             (db.venue.rate_constraint == None)
-             )
-    c_all = db(q_all).select(db.venue.id, db.venue.open_date)
-    c_all_open = []
-    for c in c_all:
-        if c.open_date < t:
-            c_all_open.append(c.id)    
-    if len(l) > 0:
-        q_user = ((db.venue.rate_close_date > datetime.utcnow()) &
-                  (db.venue.is_active == True) &
-                  (db.venue.id.belongs(l))
-                  )
-        c_user = db(q_user).select(db.venue.id, db.venue.open_date)
-        for c in c_user:
-            if c.open_date < t and c.id not in c_all_open:
-                c_all_open.append(c.id)
-    if len(c_all_open) > 0:
-	q = (db.venue.id.belongs(c_all_open))
-    else:
+    if len(l) == 0:
 	q = (db.venue.id == -1)
+    else:
+	q = ((db.venue.rate_close_date > t) & (db.venue.is_active == True) & (db.venue.id.belongs(l)))
     db.venue.rate_close_date.label = T('Review deadline')
     db.venue.name.readable = False
     grid = SQLFORM.grid(q,
         field_id=db.venue.id,
-        fields=[db.venue.name, db.venue.rate_close_date],
+        fields=[db.venue.name, db.venue.rate_open_date, db.venue.rate_close_date],
         csv=False, details=False, create=False, editable=False, deletable=False,
         links=[
 	    dict(header=T('Venue'),
 		 body = lambda r: A(r.name, _href=URL('view_venue', args=[r.id]))),
-	    dict(header='Review', 
-		 body = lambda r: A(T('Accept reviewing task'),
-			       _class='btn',
-			       _href=URL('rating', 'accept_review', args=[r.id])))],
+	    dict(header=T('Review'), body = lambda r: review_link(r)),
+	    ]
         )
     return dict(grid=grid)
+
+def review_link(r):
+    if r.rate_open_date > datetime.utcnow():
+	return T('Not yet open')
+    else:
+	return A(T('Accept reviewing task'), _class='btn',
+		 _href=URL('rating', 'accept_review', args=[r.id]))
 
                 
 @auth.requires_login()
@@ -207,28 +178,6 @@ def observed_index():
         )
     return dict(grid=grid)
 
-
-def public_index():
-    q = ((db.venue.submissions_visible_to_all == True) &
-	 ((db.venue.submissions_visible_immediately == True) | (
-	     db.venue.close_date > datetime.utcnow())))
-    db.venue.feedback_accessible_immediately.readable = False
-    db.venue.rate_open_date.readable = False
-    db.venue.rate_close_date.readable = False
-    db.venue.name.readable = False
-    grid = SQLFORM.grid(q,
-        field_id=db.venue.id,
-        fields=[db.venue.name, db.venue.description, db.venue.close_date],
-        csv=False, details=False, create=False, editable=False, deletable=False,
-        links=[
-	    dict(header=T('Details'),
-		 body = lambda r: A(T('Details'), _href=URL('view_venue', args=[r.id]))),
-	    dict(header=T('Submissions'),
-		 body = lambda r: A(T('Submissions'), _href=URL('ranking', 'view_venue', args=[r.id])))
-            ],
-        )
-    return dict(grid=grid)
-
                 
 @auth.requires_login()
 def reviewing_duties():
@@ -268,12 +217,6 @@ def get_review_deadline(venue_id):
 
 
 @auth.requires_login()
-def simple_index():
-    q = (db.venue.id.belongs([1]))
-    return dict(list=db(q).select())
-        
-
-@auth.requires_login()
 def managed_index():
     props = db(db.user_properties.email == auth.user.email).select().first()
     if props == None:
@@ -300,9 +243,9 @@ def managed_index():
     # Constrains the user lists to those managed by the user.
     list_q = (db.user_list.id.belongs(managed_user_lists))
     db.venue.submit_constraint.requires = IS_EMPTY_OR(IS_IN_DB(
-        db(list_q), 'user_list.id', '%(name)s', zero=T('-- Everybody --')))
+        db(list_q), 'user_list.id', '%(name)s', zero=T('-- Nobody --')))
     db.venue.rate_constraint.requires = IS_EMPTY_OR(IS_IN_DB(
-        db(list_q), 'user_list.id', '%(name)s', zero=T('-- Everybody --')))
+        db(list_q), 'user_list.id', '%(name)s', zero=T('-- Nobody --')))
     # Keeps track of old managers and observers, if this is an update.
     if len(request.args) > 2 and request.args[-3] == 'edit':
         c = db.venue[request.args[-1]]
@@ -328,7 +271,12 @@ def managed_index():
 	db.venue.is_approved.default = True
 	fields = [db.venue.name, db.venue.created_by, db.venue.creation_date, db.venue.is_approved, db.venue.is_active]
     else:
-	fields = [db.venue.name, db.venue.is_active]	
+	fields = [db.venue.name, db.venue.is_active]
+	db.venue.allow_multiple_submissions.readable = db.venue.allow_multiple_submissions.writable = False
+	db.venue.can_rank_own_submissions.readable = db.venue.can_rank_own_submissions.writable = False
+	db.venue.submissions_visible_to_all.readable = db.venue.submissions_visible_to_all.writable = False
+	db.venue.feedback_accessible_immediately.readable = db.venue.feedback_accessible_immediately.writable = False
+	db.venue.submissions_are_anonymized.readable = db.venue.submissions_are_anonymized.writable = False
     grid = SQLFORM.grid(q,
         field_id=db.venue.id,
         fields=fields,
