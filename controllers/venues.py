@@ -231,7 +231,7 @@ def managed_index():
 	q = (db.venue.id == -1)
     # Admins can see all venues.
     if is_user_admin():
-	q = (db.venue.id > 0)
+	q = db.venue
     # Deals with search parameter.
     if request.vars.cid and request.vars.cid != '':
         try:
@@ -306,9 +306,6 @@ def add_help_for_venue(bogus):
     db.venue.rate_close_date.comment = 'In UTC.'
     db.venue.allow_multiple_submissions.comment = (
         'Allow users to submit multiple independent pieces of work to this venue.')
-    db.venue.allow_link_submission.comment = (
-	'Allow the submissions of links.  WARNING: CrowdRanker does not ensure '
-	'that the content of the link is unchanged.')
     db.venue.feedback_accessible_immediately.comment = (
         'The feedback can be accessible immediately, or once '
         'the venue closes.')

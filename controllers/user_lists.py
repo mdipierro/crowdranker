@@ -31,8 +31,7 @@ def index():
 	q = (db.user_list.id.belongs(list_ids))
     # Fixes the query for admins.
     if is_user_admin():
-	q = (db.user_list.id > 0)
-	logger.info("all query")
+	q = db.user_list
     grid = SQLFORM.grid(q, 
         field_id = db.user_list.id,
         csv=False, details=True,
